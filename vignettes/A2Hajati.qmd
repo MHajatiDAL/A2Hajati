@@ -1,0 +1,16 @@
+---
+title: "A2Hajati"
+vignette: >
+  %\VignetteIndexEntry{A2Hajati}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+knitr:
+  opts_chunk:
+    collapse: true
+    comment: '#>'
+---
+
+```{r}
+#| label: setup
+library(A2Hajati)
+```
