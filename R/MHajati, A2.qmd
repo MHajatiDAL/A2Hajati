@@ -23,12 +23,7 @@ format: pdf
 
 1. Install the `devtools` package.
 
-```{r}
-install.packages("devtools")
-library(devtools)
 
-
-```
 2. In R Studio click the "Create a Project $\to$ New Directory $\to$ R Package
     using devtools".
     Use the directory name "A2NAME", replacing NAME with your name.
@@ -145,7 +140,7 @@ We will
     Copy the url for your GitHub repository and paste it below.
 
 
-**GitHub Repository URL**:
+**GitHub Repository URL**: https://github.com/MHajatiDAL/A2Hajati
 
 
 
@@ -154,14 +149,37 @@ We will
 - Explain how the Akaike information criterion (AIC) is computed for a 
     generalized linear model and how it is commonly used for model or variable
     selection purposed. Be sure to describe the two competing goals that AIC
-    tries to find a good balance for. (250 words)
+    tries to find a good balance for. (250 words)\
+    
+    AIC is computed using this formula:\
+$$
+AIC = -2 \log L + 2k
+$$
+    Where the log L is the log likelihood of the fitted model and k is the number of estimated parameters.
+    For a GLM, the log-likelihood depends on the assumed distribution and the estimated parameters. so for more
+    complex models usually give a yield a higher likelihood (log L), but this means that there is the cost of
+    additional parameters (k), which increases the AIC value. You want to pick the model with lowest AIC value
+    because it shows that it has a good balance of fitting the data and not being too complex with too many
+    parameters. This quality makes the AIC a good tool to compare the models relatively but does not speak to the
+    actual ability of any of the models to make good or bad predictions. AIC provides a measure of a models relative
+    quality by balancing model fit and model simplicity. Models with more parameters generally fit the data better,
+    but Overly complex models risk overfitting, so they look at the noise instead of the actual pattern, but the
+    penalty term (2k) discourages this. So you need the balance.
 
 # Question 3 (4 points)
 
 - Residual checking for GLMs is not always as straightforward as it is for
     linear models, and the problems are particularly acute in the case of binary
     responses. 
-    Explain why (100 words)
+    Explain why (100 words)\
+    
+    
+    
+    GLM usually involve non gaussian error distribution and the link function transforms the response variable making the process more complicated. For binary case, the issue is that the residual can either be 0 or 1 so its discrete instead of continous, meaning that the residual plots are less informative than they normally are. usually residuals are continous making them more informative but here they are discrete and do not follow normality. So this makes them really hard.
+    
+    
+    
+    
 
 # Question 4 (16 points)
 
@@ -183,6 +201,89 @@ We will
 if( !requireNamespace("ISwR", quietly = TRUE) ) install.packages("ISwR")
 library(ISwR)
 data(cystfibr)
+
+str(cystfibr)
+
+summary(cystfibr)
+
+# going with a linear to see if we are lucky
+model1 <- lm(pemax ~ ., data = cystfibr)
+
+summary(model1)
+# from the summary i can see that sex, age, height, weight, FEV1, RV, FRC, TLC 
+# have high P values so fail the statistical test
+
+# plot to see if I can get anything from it
+par(mfrow = c(2, 2))
+plot(model1)
+
+# observations 16 and 24 seem to be have a lot leverage so gonna check them
+cystfibr[c(16, 24), ]
+
+
+# decided to delete them since 16 had short height and low weight 
+# compared to average and 24 was taller and heavier than average
+cystfibr_filtered <- cystfibr[-c(16, 24), ]
+
+# doing the model again with the new data
+model_filtered <- lm(pemax ~ ., data = cystfibr_filtered)
+
+# getting the summary again
+summary(model_filtered)
+
+# in this one we have a higher R^2 meaning better fit
+# a lower residual standard error again meaning better
+# and a lower P value so our model is more statistically significant
+# from this I can say that deleting 16 and 24 was the right call
+# but i did this in a linear model, does that mean in other models
+# 16 and 24 might actually be good or does this mean that
+# 16 and 24 are bad across the board for all models?
+
+# doing a stepwise selection
+model_step <- step(model_filtered, direction = "both")
+summary(model_step)
+
+# looking at the summary the lowest AIC is for the:
+# weight + bmp + fev1+ rv model
+# I can see that in that model again theR^2 is higher than before
+# the residual standard error is lower than before and the P value
+# very small so it is very significant
+
+# I can also look at individual parameter P values
+# so we can see that weight has the lowest one meaning that
+# weight and Pemax are highly positively correlated
+# then fev1 and pemax are positively correlated
+# then BMP and pemax are negatively correlated
+# then the P value for rv is higher than 0.05, not sure why it would not exclude it
+
+# gonna run a test for a model without rv since its p value is higher than 0.05
+model_filtered_2 <- lm(pemax ~ weight + bmp +fev1, data = cystfibr_filtered)
+summary(model_filtered_2)
+# okay so the model R^2, p value and residual standard error all went in the bad way
+# so gonna keep rv in there.
+
+
+# now we can check the residuals
+par(mfrow = c(2,2))
+plot(model_step)  # Check residual plots
+
+# I can still see some curvature maybe I should do a log transform
+
+cystfibr_filtered$log_pemax <- log(cystfibr_filtered$pemax)
+model_log <- lm(log_pemax ~ weight + bmp + fev1 + rv, data = cystfibr_filtered)
+summary(model_log)
+par(mfrow = c(2,2))
+plot(model_log)
+
+# so after doing that we get a much lower residual std error
+# but also a little bit lower R^2 and a little bit higher P value.
+# but still the drop in residual std error is so much that I think its worth
+
+# I think this is the best model and it tells us
+# that weight, BMP, and FEV1 are highly correlated with pemax
+# and you need RV to get a good fit of pemax
+
+
 ```
 
 
@@ -208,20 +309,102 @@ Show how to parameterize the following piecewise linear spline to ensure that
     input and gives you the sum-of-squared errors as output, using cystfibr as
     your dataset, pemax as your response variable, and weight as your covariate.
     Then use the nlminb function to find the best estimate for $\beta$ and plot
-    the estimated piecewise linear function in the same plot as the data.
+    the estimated piecewise linear function in the same plot as the data.\
+
+  So we need to think of the function like this: 
+  
+  $$
+  f_{i}\left(x\right) = \beta_{0, i} + \beta_{1,i}\left(x - l_{i}\right)
+  $$   
+  
+  and if we look at the knots we get these segments:
+  
+  $$
+  x \in [10, 30] \rightarrow f_{1}(x) = \beta_{1} + \beta_{2}(x - 10)
+  $$
+  $$
+  x \in [30, 50] \rightarrow f_{2}(x) = \beta_{5} + \beta_{3}(x - 30)
+  $$
+  
+  $$
+  x \in [50, 75] \rightarrow f_{3}(x) = \beta_{6} + \beta_{4}(x - 50)
+  $$
+  To get continuity we need $f_{1}(30) = f_{2}(30)$ and $f_{2}(50) = f_{3}(50)$, so we get:
+  
+  $$
+  \beta_{1} + \beta_{2}(30 - 10) = \beta_{5} + \beta_{3}(30 - 30) \rightarrow \beta_{1} + 20\beta_{2} = \beta_{5}
+  $$
+  
+  $$
+  \beta_{5} + \beta_{3}(50 - 30) = \beta_{6} + \beta_{4}(50 - 50) \rightarrow \beta_{5} + 20\beta_{3} = \beta_{6}
+  $$
+  Then from those we can combine them to get this:
+  $$
+  \beta_{6} = \beta_{1} + 20\beta_{2} + 20\beta_{3}
+  $$
+  we can rewrite the equations using this new information:
+  $$
+  x \in [10, 30] \rightarrow f_{1}(x) = \beta_{1} + \beta_{2}(x - 10)
+  $$
+  
+  $$
+  x \in [30, 50] \rightarrow f_{2}(x) = \beta_{1} + 20\beta_{2} + \beta_{3}(x - 30)
+  $$
+  
+  $$
+  x \in [50, 75] \rightarrow f_{3}(x) = \beta_{1} + 20\beta_{2} + 20\beta_{3} + \beta_{4}(x - 50)
+  $$
 
 ```{r}
 knots<- c(10, 30, 50, 75)
+
 f<- function(beta, x) {
-    which_piece<- x |> cut(knots, labels = FALSE)
+    
+    # i changed the code here cause i did not like the syntax
+    which_piece<- cut(x, breaks = knots, labels = FALSE)
     linear_pieces<- list()
-    linear_pieces[[1]]<- function(x) beta[1] + beta[2] * (x - knots[1])
-    linear_pieces[[2]]<- function(x) beta[5] + beta[3] * (x - knots[2])
-    linear_pieces[[3]]<- function(x) beta[6] + beta[4] * (x - knots[3])
+    
+    # i changed the equations below to match the new ones found
+    linear_pieces[[1]] <- function(x) beta[1] + beta[2] * (x - knots[1])
+    linear_pieces[[2]] <- function(x) (beta[1] + 20 * beta[2]) + beta[3] * (x - knots[2])
+    linear_pieces[[3]] <- function(x) (beta[1] + 20 * beta[2] + 20 * beta[3]) + 
+      beta[4] * (x - knots[3])
+    
     prediction<- sapply(
-        x |> seq_along(),
+      # again my syntax here is much more readable
+        seq_along(x),
         function(i) linear_pieces[[which_piece[i]]](x[i])
     )
-    return( prediction )
+    return(prediction)
 }
+
+
+# my sum of squares function
+sum_of_squares <- function(beta) {
+    predicted <- f(beta, cystfibr$weight)
+    residuals <- cystfibr$pemax - predicted
+    return(sum(residuals^2))
+}
+
+# just put some random number
+beta_start <- c(10, 10, 10, 10)
+# how can i be sure that my starting location leads to a global minima 
+#and not a local minima?
+
+# use nlminb, beta_start and to minimize the sum_of_squares function
+result <- nlminb(start = beta_start, objective = sum_of_squares)
+
+# get the best found paramters for beta
+beta_best <- result$par
+
+# now plot them
+plot(cystfibr$weight, cystfibr$pemax, pch = 16, col = "blue", 
+     xlab = "Weight", ylab = "PEmax", main = "Piecewise Linear Spline Fit")
+curve(f(beta_best, x), add = TRUE, col = "red", lwd = 2)
+
+# looking at the graph i can definitely see three different slopes 
+# and three different segments
+# so the piecewise linear function actually works
+
+
 ```
