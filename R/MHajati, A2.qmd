@@ -1,5 +1,5 @@
 ---
-title: Assignment 2
+title: Mehrad Hajati, Assignment 2
 subtitle: STAT 4620/5620 Winter 2025
 vignette: >
   %\VignetteIndexEntry{A2NAME}
